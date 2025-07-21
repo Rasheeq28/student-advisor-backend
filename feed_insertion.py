@@ -30,7 +30,7 @@ if st.button("Submit"):
     }
 
     try:
-        response = supabase.table("your_table_name").insert(data).execute()
+        response = supabase.table("Feed").insert(data).execute()
         st.success("✅ Successfully added to Supabase!")
     except Exception as e:
         st.error(f"❌ Error: {e}")
