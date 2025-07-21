@@ -1106,6 +1106,319 @@
 
 
 # loginv2
+# import streamlit as st
+# from supabase import create_client
+# from datetime import datetime
+# import uuid
+# import requests
+#
+# # Load from secrets
+# SUPABASE_URL = st.secrets["supabase"]["url"]
+# SERVICE_ROLE_KEY = st.secrets["supabase"]["service_role_key"]  # Must be service role key!
+# supabase = create_client(SUPABASE_URL, SERVICE_ROLE_KEY)
+#
+# HEADERS = {
+#     "apikey": SERVICE_ROLE_KEY,
+#     "Authorization": f"Bearer {SERVICE_ROLE_KEY}",
+#     "Content-Type": "application/json",
+# }
+#
+# # --- Admin API helper functions ---
+# def create_user(email, password):
+#     url = f"{SUPABASE_URL}/auth/v1/admin/users"
+#     payload = {
+#         "email": email,
+#         "password": password,
+#         "email_confirm": True
+#     }
+#     r = requests.post(url, json=payload, headers=HEADERS)
+#     return r.json()
+#
+# def update_user(user_id, email=None, password=None):
+#     url = f"{SUPABASE_URL}/auth/v1/admin/users/{user_id}"
+#     payload = {}
+#     if email:
+#         payload["email"] = email
+#     if password:
+#         payload["password"] = password
+#     r = requests.put(url, json=payload, headers=HEADERS)
+#     return r.json()
+#
+# def delete_user(user_id):
+#     url = f"{SUPABASE_URL}/auth/v1/admin/users/{user_id}"
+#     r = requests.delete(url, headers=HEADERS)
+#     return r.json()
+#
+# # ----------- Streamlit UI -----------
+#
+# st.title("📚 Admin Panel - Content Manager")
+#
+# tabs = st.tabs(["➕ Create", "📖 Read", "📝 Update", "❌ Delete", "👤 Users"])
+#
+# # ---------- CREATE ----------
+# with tabs[0]:
+#     st.header("Add New Content")
+#
+#     producer_name = st.text_input("Producer Name")
+#     title = st.text_input("Title")
+#     description = st.text_area("Description")
+#     content_type = st.selectbox("Content Type", ["Article", "Course", "CA", "Bizcomp"], key="create_content_type")
+#     tags = st.text_input("Tags (comma separated)")
+#     date_tag = st.date_input("Date Tag")
+#     img_file = st.file_uploader("Upload Image", type=["png", "jpg", "jpeg"])
+#
+#     if st.button("Submit"):
+#         if img_file:
+#             try:
+#                 unique_filename = f"{uuid.uuid4()}_{img_file.name}"
+#                 file_bytes = img_file.read()
+#                 supabase.storage.from_("feed-img").upload(unique_filename, file_bytes)
+#                 public_url = supabase.storage.from_("feed-img").get_public_url(unique_filename)
+#             except Exception as e:
+#                 st.error(f"❌ Upload failed: {e}")
+#                 st.stop()
+#         else:
+#             public_url = ""
+#
+#         data = {
+#             "producer_name": producer_name,
+#             "title": title,
+#             "Description": description,
+#             "content_type": content_type,
+#             "tags": tags,
+#             "date_tag": str(date_tag),
+#             "img_link": public_url,
+#         }
+#
+#         try:
+#             supabase.table("Feed").insert(data).execute()
+#             st.success("✅ Content added successfully!")
+#         except Exception as e:
+#             st.error(f"❌ Error: {e}")
+#
+# # ---------- READ ----------
+# with tabs[1]:
+#     st.header("View All Content")
+#     search_term = st.text_input("🔍 Search by title or producer name", key="read_search")
+#
+#     try:
+#         response = supabase.table("Feed").select("*").execute()
+#         records = response.data
+#
+#         if search_term:
+#             records = [r for r in records if search_term.lower() in r["title"].lower() or search_term.lower() in r["producer_name"].lower()]
+#
+#         if records:
+#             for record in records:
+#                 st.subheader(record["title"])
+#                 st.markdown(f"**Producer:** {record['producer_name']}")
+#                 st.markdown(f"**Type:** {record['content_type']}")
+#                 st.markdown(f"**Tags:** {record['tags']}")
+#                 st.markdown(f"**Date:** {record['date_tag']}")
+#                 st.markdown(f"**Description:** {record['Description']}")
+#                 if record["img_link"]:
+#                     st.image(record["img_link"], width=300)
+#                 st.markdown("---")
+#         else:
+#             st.info("No records found.")
+#     except Exception as e:
+#         st.error(f"❌ Error: {e}")
+#
+# # ---------- UPDATE ----------
+# with tabs[2]:
+#     st.header("Update Existing Content")
+#     try:
+#         response = supabase.table("Feed").select("*").execute()
+#         records = response.data
+#         search_term = st.text_input("🔍 Search by producer name", key="update_search")
+#
+#         if search_term:
+#             records = [r for r in records if search_term.lower() in r["producer_name"].lower()]
+#
+#         producers = [f"{r['producer_name']} - {r['title']}" for r in records]
+#         if producers:
+#             selected_display = st.selectbox("Select content by producer", producers, key="update_selectbox")
+#             selected_record = next((r for r in records if f"{r['producer_name']} - {r['title']}" == selected_display), None)
+#
+#             if selected_record:
+#                 new_title = st.text_input("Title", selected_record["title"])
+#                 new_description = st.text_area("Description", selected_record["Description"])
+#                 new_tags = st.text_input("Tags", selected_record["tags"])
+#                 new_date_tag = st.date_input("Date Tag", datetime.strptime(selected_record["date_tag"], "%Y-%m-%d"))
+#                 new_type = st.selectbox("Content Type", ["Article", "Course", "CA", "Bizcomp"], index=["Article", "Course", "CA", "Bizcomp"].index(selected_record["content_type"]), key="update_type")
+#                 new_img = st.file_uploader("New Image (optional)", key="update_img")
+#
+#                 if st.button("Update"):
+#                     update_data = {
+#                         "title": new_title,
+#                         "Description": new_description,
+#                         "tags": new_tags,
+#                         "date_tag": str(new_date_tag),
+#                         "content_type": new_type,
+#                     }
+#
+#                     if new_img:
+#                         unique_filename = f"{uuid.uuid4()}_{new_img.name}"
+#                         file_bytes = new_img.read()
+#                         supabase.storage.from_("feed-img").upload(unique_filename, file_bytes)
+#                         public_url = supabase.storage.from_("feed-img").get_public_url(unique_filename)
+#                         update_data["img_link"] = public_url
+#
+#                     supabase.table("Feed").update(update_data).eq("id", selected_record["id"]).execute()
+#                     st.success("✅ Content updated successfully!")
+#         else:
+#             st.info("No records found.")
+#     except Exception as e:
+#         st.error(f"❌ Error: {e}")
+#
+# # ---------- DELETE ----------
+# with tabs[3]:
+#     st.header("Delete Content")
+#     try:
+#         response = supabase.table("Feed").select("*").execute()
+#         records = response.data
+#         search_term = st.text_input("🔍 Search by producer name", key="delete_search")
+#
+#         if search_term:
+#             records = [r for r in records if search_term.lower() in r["producer_name"].lower()]
+#
+#         producers = [f"{r['producer_name']} - {r['title']}" for r in records]
+#         selected_display = st.selectbox("Select content to delete", producers, key="delete_selectbox")
+#         selected_record = next((r for r in records if f"{r['producer_name']} - {r['title']}" == selected_display), None)
+#
+#         if st.button("Delete"):
+#             supabase.table("Feed").delete().eq("id", selected_record["id"]).execute()
+#             st.success("🗑️ Deleted successfully!")
+#     except Exception as e:
+#         st.error(f"❌ Error: {e}")
+#
+# # ---------- USERS TAB ----------
+# with tabs[4]:
+#     st.header("Manage Authenticated Users")
+#
+#     user_tabs = st.tabs(["➕ Add User", "📋 List Users", "📝 Update User", "❌ Delete User"])
+#
+#     # 1. Add User
+#     with user_tabs[0]:
+#         st.subheader("Add New User")
+#         new_email = st.text_input("Email", key="new_email")
+#         new_full_name = st.text_input("Full Name", key="new_full_name")
+#         new_password = st.text_input("Password", type="password", key="new_password")
+#
+#         if st.button("Create User"):
+#             if not new_email or not new_password:
+#                 st.error("Email and password are required!")
+#             else:
+#                 try:
+#                     res = create_user(new_email, new_password)
+#                     if res.get("id"):
+#                         user_id = res["id"]
+#                         insert_res = supabase.table("authenticated_users").insert({
+#                             "id": user_id,
+#                             "email": new_email,
+#                             "full_name": new_full_name
+#                         }).execute()
+#                         if insert_res.error:
+#                             st.warning(f"User created but failed to add profile: {insert_res.error.message}")
+#                         else:
+#                             st.success(f"User created with ID: {user_id}")
+#                     else:
+#                         st.error(f"Failed to create user: {res}")
+#                 except Exception as e:
+#                     st.error(f"Exception: {e}")
+#
+#     # 2. List Users
+#     with user_tabs[1]:
+#         st.subheader("List Users")
+#         try:
+#             profiles_res = supabase.table("authenticated_users").select("*").execute()
+#             profiles = profiles_res.data
+#
+#             if profiles:
+#                 for p in profiles:
+#                     st.markdown(f"**ID:** {p['id']}")
+#                     st.markdown(f"**Email:** {p['email']}")
+#                     st.markdown(f"**Full Name:** {p.get('full_name', '')}")
+#                     st.markdown("---")
+#             else:
+#                 st.info("No users found.")
+#         except Exception as e:
+#             st.error(f"Error fetching users: {e}")
+#
+#     # 3. Update User
+#     with user_tabs[2]:
+#         st.subheader("Update User")
+#
+#         try:
+#             profiles_res = supabase.table("authenticated_users").select("*").execute()
+#             profiles = profiles_res.data
+#
+#             if profiles:
+#                 user_display = [f"{p['email']} - {p.get('full_name', '')}" for p in profiles]
+#                 selected_user = st.selectbox("Select user to update", user_display)
+#
+#                 user_obj = next((p for p in profiles if f"{p['email']} - {p.get('full_name', '')}" == selected_user), None)
+#
+#                 if user_obj:
+#                     updated_email = st.text_input("Email", value=user_obj["email"], key="update_email")
+#                     updated_full_name = st.text_input("Full Name", value=user_obj.get("full_name", ""), key="update_full_name")
+#                     updated_password = st.text_input("New Password (leave blank to keep unchanged)", type="password", key="update_password")
+#
+#                     if st.button("Update User"):
+#                         update_data = {
+#                             "email": updated_email,
+#                             "full_name": updated_full_name
+#                         }
+#                         try:
+#                             update_auth_resp = update_user(user_obj["id"], email=updated_email, password=updated_password if updated_password else None)
+#                             if update_auth_resp.get("id"):
+#                                 update_profile_res = supabase.table("authenticated_users").update(update_data).eq("id", user_obj["id"]).execute()
+#                                 if update_profile_res.error:
+#                                     st.warning(f"User auth updated but profile update failed: {update_profile_res.error.message}")
+#                                 else:
+#                                     st.success("User updated successfully!")
+#                             else:
+#                                 st.error(f"Failed to update auth user: {update_auth_resp}")
+#                         except Exception as e:
+#                             st.error(f"Exception during update: {e}")
+#             else:
+#                 st.info("No users found.")
+#         except Exception as e:
+#             st.error(f"Error fetching users: {e}")
+#
+#     # 4. Delete User
+#     with user_tabs[3]:
+#         st.subheader("Delete User")
+#         try:
+#             profiles_res = supabase.table("authenticated_users").select("*").execute()
+#             profiles = profiles_res.data
+#
+#             if profiles:
+#                 user_display = [f"{p['email']} - {p.get('full_name', '')}" for p in profiles]
+#                 selected_user = st.selectbox("Select user to delete", user_display)
+#
+#                 user_obj = next((p for p in profiles if f"{p['email']} - {p.get('full_name', '')}" == selected_user), None)
+#
+#                 if st.button("Delete User"):
+#                     try:
+#                         del_auth_resp = delete_user(user_obj["id"])
+#                         if del_auth_resp == {}:  # delete returns empty dict on success
+#                             del_profile_resp = supabase.table("authenticated_users").delete().eq("id", user_obj["id"]).execute()
+#                             if del_profile_resp.error:
+#                                 st.warning(f"Auth user deleted but profile delete failed: {del_profile_resp.error.message}")
+#                             else:
+#                                 st.success("User deleted successfully!")
+#                         else:
+#                             st.error(f"Failed to delete auth user: {del_auth_resp}")
+#                     except Exception as e:
+#                         st.error(f"Exception during deletion: {e}")
+#             else:
+#                 st.info("No users found.")
+#         except Exception as e:
+#             st.error(f"Error fetching users: {e}")
+
+
+# loginv3
 import streamlit as st
 from supabase import create_client
 from datetime import datetime
@@ -1191,8 +1504,11 @@ with tabs[0]:
         }
 
         try:
-            supabase.table("Feed").insert(data).execute()
-            st.success("✅ Content added successfully!")
+            res = supabase.table("Feed").insert(data).execute()
+            if res.error:
+                st.error(f"❌ Error inserting content: {res.error.message}")
+            else:
+                st.success("✅ Content added successfully!")
         except Exception as e:
             st.error(f"❌ Error: {e}")
 
@@ -1203,24 +1519,26 @@ with tabs[1]:
 
     try:
         response = supabase.table("Feed").select("*").execute()
-        records = response.data
-
-        if search_term:
-            records = [r for r in records if search_term.lower() in r["title"].lower() or search_term.lower() in r["producer_name"].lower()]
-
-        if records:
-            for record in records:
-                st.subheader(record["title"])
-                st.markdown(f"**Producer:** {record['producer_name']}")
-                st.markdown(f"**Type:** {record['content_type']}")
-                st.markdown(f"**Tags:** {record['tags']}")
-                st.markdown(f"**Date:** {record['date_tag']}")
-                st.markdown(f"**Description:** {record['Description']}")
-                if record["img_link"]:
-                    st.image(record["img_link"], width=300)
-                st.markdown("---")
+        if response.error:
+            st.error(f"❌ Error fetching content: {response.error.message}")
         else:
-            st.info("No records found.")
+            records = response.data
+            if search_term:
+                records = [r for r in records if search_term.lower() in r["title"].lower() or search_term.lower() in r["producer_name"].lower()]
+
+            if records:
+                for record in records:
+                    st.subheader(record["title"])
+                    st.markdown(f"**Producer:** {record['producer_name']}")
+                    st.markdown(f"**Type:** {record['content_type']}")
+                    st.markdown(f"**Tags:** {record['tags']}")
+                    st.markdown(f"**Date:** {record['date_tag']}")
+                    st.markdown(f"**Description:** {record['Description']}")
+                    if record["img_link"]:
+                        st.image(record["img_link"], width=300)
+                    st.markdown("---")
+            else:
+                st.info("No records found.")
     except Exception as e:
         st.error(f"❌ Error: {e}")
 
@@ -1229,45 +1547,51 @@ with tabs[2]:
     st.header("Update Existing Content")
     try:
         response = supabase.table("Feed").select("*").execute()
-        records = response.data
-        search_term = st.text_input("🔍 Search by producer name", key="update_search")
-
-        if search_term:
-            records = [r for r in records if search_term.lower() in r["producer_name"].lower()]
-
-        producers = [f"{r['producer_name']} - {r['title']}" for r in records]
-        if producers:
-            selected_display = st.selectbox("Select content by producer", producers, key="update_selectbox")
-            selected_record = next((r for r in records if f"{r['producer_name']} - {r['title']}" == selected_display), None)
-
-            if selected_record:
-                new_title = st.text_input("Title", selected_record["title"])
-                new_description = st.text_area("Description", selected_record["Description"])
-                new_tags = st.text_input("Tags", selected_record["tags"])
-                new_date_tag = st.date_input("Date Tag", datetime.strptime(selected_record["date_tag"], "%Y-%m-%d"))
-                new_type = st.selectbox("Content Type", ["Article", "Course", "CA", "Bizcomp"], index=["Article", "Course", "CA", "Bizcomp"].index(selected_record["content_type"]), key="update_type")
-                new_img = st.file_uploader("New Image (optional)", key="update_img")
-
-                if st.button("Update"):
-                    update_data = {
-                        "title": new_title,
-                        "Description": new_description,
-                        "tags": new_tags,
-                        "date_tag": str(new_date_tag),
-                        "content_type": new_type,
-                    }
-
-                    if new_img:
-                        unique_filename = f"{uuid.uuid4()}_{new_img.name}"
-                        file_bytes = new_img.read()
-                        supabase.storage.from_("feed-img").upload(unique_filename, file_bytes)
-                        public_url = supabase.storage.from_("feed-img").get_public_url(unique_filename)
-                        update_data["img_link"] = public_url
-
-                    supabase.table("Feed").update(update_data).eq("id", selected_record["id"]).execute()
-                    st.success("✅ Content updated successfully!")
+        if response.error:
+            st.error(f"❌ Error fetching content: {response.error.message}")
         else:
-            st.info("No records found.")
+            records = response.data
+            search_term = st.text_input("🔍 Search by producer name", key="update_search")
+
+            if search_term:
+                records = [r for r in records if search_term.lower() in r["producer_name"].lower()]
+
+            producers = [f"{r['producer_name']} - {r['title']}" for r in records]
+            if producers:
+                selected_display = st.selectbox("Select content by producer", producers, key="update_selectbox")
+                selected_record = next((r for r in records if f"{r['producer_name']} - {r['title']}" == selected_display), None)
+
+                if selected_record:
+                    new_title = st.text_input("Title", selected_record["title"])
+                    new_description = st.text_area("Description", selected_record["Description"])
+                    new_tags = st.text_input("Tags", selected_record["tags"])
+                    new_date_tag = st.date_input("Date Tag", datetime.strptime(selected_record["date_tag"], "%Y-%m-%d"))
+                    new_type = st.selectbox("Content Type", ["Article", "Course", "CA", "Bizcomp"], index=["Article", "Course", "CA", "Bizcomp"].index(selected_record["content_type"]), key="update_type")
+                    new_img = st.file_uploader("New Image (optional)", key="update_img")
+
+                    if st.button("Update"):
+                        update_data = {
+                            "title": new_title,
+                            "Description": new_description,
+                            "tags": new_tags,
+                            "date_tag": str(new_date_tag),
+                            "content_type": new_type,
+                        }
+
+                        if new_img:
+                            unique_filename = f"{uuid.uuid4()}_{new_img.name}"
+                            file_bytes = new_img.read()
+                            supabase.storage.from_("feed-img").upload(unique_filename, file_bytes)
+                            public_url = supabase.storage.from_("feed-img").get_public_url(unique_filename)
+                            update_data["img_link"] = public_url
+
+                        update_res = supabase.table("Feed").update(update_data).eq("id", selected_record["id"]).execute()
+                        if update_res.error:
+                            st.error(f"❌ Update failed: {update_res.error.message}")
+                        else:
+                            st.success("✅ Content updated successfully!")
+            else:
+                st.info("No records found.")
     except Exception as e:
         st.error(f"❌ Error: {e}")
 
@@ -1276,19 +1600,28 @@ with tabs[3]:
     st.header("Delete Content")
     try:
         response = supabase.table("Feed").select("*").execute()
-        records = response.data
-        search_term = st.text_input("🔍 Search by producer name", key="delete_search")
+        if response.error:
+            st.error(f"❌ Error fetching content: {response.error.message}")
+        else:
+            records = response.data
+            search_term = st.text_input("🔍 Search by producer name", key="delete_search")
 
-        if search_term:
-            records = [r for r in records if search_term.lower() in r["producer_name"].lower()]
+            if search_term:
+                records = [r for r in records if search_term.lower() in r["producer_name"].lower()]
 
-        producers = [f"{r['producer_name']} - {r['title']}" for r in records]
-        selected_display = st.selectbox("Select content to delete", producers, key="delete_selectbox")
-        selected_record = next((r for r in records if f"{r['producer_name']} - {r['title']}" == selected_display), None)
+            producers = [f"{r['producer_name']} - {r['title']}" for r in records]
+            if producers:
+                selected_display = st.selectbox("Select content to delete", producers, key="delete_selectbox")
+                selected_record = next((r for r in records if f"{r['producer_name']} - {r['title']}" == selected_display), None)
 
-        if st.button("Delete"):
-            supabase.table("Feed").delete().eq("id", selected_record["id"]).execute()
-            st.success("🗑️ Deleted successfully!")
+                if st.button("Delete"):
+                    del_res = supabase.table("Feed").delete().eq("id", selected_record["id"]).execute()
+                    if del_res.error:
+                        st.error(f"❌ Delete failed: {del_res.error.message}")
+                    else:
+                        st.success("🗑️ Deleted successfully!")
+            else:
+                st.info("No records found.")
     except Exception as e:
         st.error(f"❌ Error: {e}")
 
@@ -1313,6 +1646,7 @@ with tabs[4]:
                     res = create_user(new_email, new_password)
                     if res.get("id"):
                         user_id = res["id"]
+                        # Insert profile WITHOUT password
                         insert_res = supabase.table("authenticated_users").insert({
                             "id": user_id,
                             "email": new_email,
@@ -1332,16 +1666,18 @@ with tabs[4]:
         st.subheader("List Users")
         try:
             profiles_res = supabase.table("authenticated_users").select("*").execute()
-            profiles = profiles_res.data
-
-            if profiles:
-                for p in profiles:
-                    st.markdown(f"**ID:** {p['id']}")
-                    st.markdown(f"**Email:** {p['email']}")
-                    st.markdown(f"**Full Name:** {p.get('full_name', '')}")
-                    st.markdown("---")
+            if profiles_res.error:
+                st.error(f"Error fetching users: {profiles_res.error.message}")
             else:
-                st.info("No users found.")
+                profiles = profiles_res.data
+                if profiles:
+                    for p in profiles:
+                        st.markdown(f"**ID:** {p['id']}")
+                        st.markdown(f"**Email:** {p['email']}")
+                        st.markdown(f"**Full Name:** {p.get('full_name', '')}")
+                        st.markdown("---")
+                else:
+                    st.info("No users found.")
         except Exception as e:
             st.error(f"Error fetching users: {e}")
 
@@ -1351,38 +1687,44 @@ with tabs[4]:
 
         try:
             profiles_res = supabase.table("authenticated_users").select("*").execute()
-            profiles = profiles_res.data
-
-            if profiles:
-                user_display = [f"{p['email']} - {p.get('full_name', '')}" for p in profiles]
-                selected_user = st.selectbox("Select user to update", user_display)
-
-                user_obj = next((p for p in profiles if f"{p['email']} - {p.get('full_name', '')}" == selected_user), None)
-
-                if user_obj:
-                    updated_email = st.text_input("Email", value=user_obj["email"], key="update_email")
-                    updated_full_name = st.text_input("Full Name", value=user_obj.get("full_name", ""), key="update_full_name")
-                    updated_password = st.text_input("New Password (leave blank to keep unchanged)", type="password", key="update_password")
-
-                    if st.button("Update User"):
-                        update_data = {
-                            "email": updated_email,
-                            "full_name": updated_full_name
-                        }
-                        try:
-                            update_auth_resp = update_user(user_obj["id"], email=updated_email, password=updated_password if updated_password else None)
-                            if update_auth_resp.get("id"):
-                                update_profile_res = supabase.table("authenticated_users").update(update_data).eq("id", user_obj["id"]).execute()
-                                if update_profile_res.error:
-                                    st.warning(f"User auth updated but profile update failed: {update_profile_res.error.message}")
-                                else:
-                                    st.success("User updated successfully!")
-                            else:
-                                st.error(f"Failed to update auth user: {update_auth_resp}")
-                        except Exception as e:
-                            st.error(f"Exception during update: {e}")
+            if profiles_res.error:
+                st.error(f"Error fetching users: {profiles_res.error.message}")
             else:
-                st.info("No users found.")
+                profiles = profiles_res.data
+                if profiles:
+                    user_display = [f"{p['email']} - {p.get('full_name', '')}" for p in profiles]
+                    selected_user = st.selectbox("Select user to update", user_display)
+
+                    user_obj = next((p for p in profiles if f"{p['email']} - {p.get('full_name', '')}" == selected_user), None)
+
+                    if user_obj:
+                        updated_email = st.text_input("Email", value=user_obj["email"], key="update_email")
+                        updated_full_name = st.text_input("Full Name", value=user_obj.get("full_name", ""), key="update_full_name")
+                        updated_password = st.text_input("New Password (leave blank to keep unchanged)", type="password", key="update_password")
+
+                        if st.button("Update User"):
+                            update_data = {
+                                "email": updated_email,
+                                "full_name": updated_full_name
+                            }
+                            try:
+                                update_auth_resp = update_user(
+                                    user_obj["id"],
+                                    email=updated_email,
+                                    password=updated_password if updated_password else None
+                                )
+                                if update_auth_resp.get("id"):
+                                    update_profile_res = supabase.table("authenticated_users").update(update_data).eq("id", user_obj["id"]).execute()
+                                    if update_profile_res.error:
+                                        st.warning(f"User auth updated but profile update failed: {update_profile_res.error.message}")
+                                    else:
+                                        st.success("User updated successfully!")
+                                else:
+                                    st.error(f"Failed to update auth user: {update_auth_resp}")
+                            except Exception as e:
+                                st.error(f"Exception during update: {e}")
+                else:
+                    st.info("No users found.")
         except Exception as e:
             st.error(f"Error fetching users: {e}")
 
@@ -1391,28 +1733,31 @@ with tabs[4]:
         st.subheader("Delete User")
         try:
             profiles_res = supabase.table("authenticated_users").select("*").execute()
-            profiles = profiles_res.data
-
-            if profiles:
-                user_display = [f"{p['email']} - {p.get('full_name', '')}" for p in profiles]
-                selected_user = st.selectbox("Select user to delete", user_display)
-
-                user_obj = next((p for p in profiles if f"{p['email']} - {p.get('full_name', '')}" == selected_user), None)
-
-                if st.button("Delete User"):
-                    try:
-                        del_auth_resp = delete_user(user_obj["id"])
-                        if del_auth_resp == {}:  # delete returns empty dict on success
-                            del_profile_resp = supabase.table("authenticated_users").delete().eq("id", user_obj["id"]).execute()
-                            if del_profile_resp.error:
-                                st.warning(f"Auth user deleted but profile delete failed: {del_profile_resp.error.message}")
-                            else:
-                                st.success("User deleted successfully!")
-                        else:
-                            st.error(f"Failed to delete auth user: {del_auth_resp}")
-                    except Exception as e:
-                        st.error(f"Exception during deletion: {e}")
+            if profiles_res.error:
+                st.error(f"Error fetching users: {profiles_res.error.message}")
             else:
-                st.info("No users found.")
+                profiles = profiles_res.data
+                if profiles:
+                    user_display = [f"{p['email']} - {p.get('full_name', '')}" for p in profiles]
+                    selected_user = st.selectbox("Select user to delete", user_display)
+
+                    user_obj = next((p for p in profiles if f"{p['email']} - {p.get('full_name', '')}" == selected_user), None)
+
+                    if st.button("Delete User"):
+                        try:
+                            del_auth_resp = delete_user(user_obj["id"])
+                            # Supabase Auth returns {} on successful delete
+                            if del_auth_resp == {}:
+                                del_profile_resp = supabase.table("authenticated_users").delete().eq("id", user_obj["id"]).execute()
+                                if del_profile_resp.error:
+                                    st.warning(f"Auth user deleted but profile delete failed: {del_profile_resp.error.message}")
+                                else:
+                                    st.success("User deleted successfully!")
+                            else:
+                                st.error(f"Failed to delete auth user: {del_auth_resp}")
+                        except Exception as e:
+                            st.error(f"Exception during deletion: {e}")
+                else:
+                    st.info("No users found.")
         except Exception as e:
             st.error(f"Error fetching users: {e}")
