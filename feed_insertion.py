@@ -479,7 +479,7 @@ HEADERS = {
 
 # --- Admin API helper functions ---
 def create_user(email, password):
-    url = f"https://{SUPABASE_URL}/auth/v1/admin/users"
+    url = f"{SUPABASE_URL}/auth/v1/admin/users"
     payload = {
         "email": email,
         "password": password,
@@ -489,7 +489,7 @@ def create_user(email, password):
     return r.json()
 
 def update_user(user_id, email=None, password=None):
-    url = f"https://{SUPABASE_URL}/auth/v1/admin/users/{user_id}"
+    url = f"{SUPABASE_URL}/auth/v1/admin/users/{user_id}"
     payload = {}
     if email:
         payload["email"] = email
@@ -499,7 +499,7 @@ def update_user(user_id, email=None, password=None):
     return r.json()
 
 def delete_user(user_id):
-    url = f"https://{SUPABASE_URL}/auth/v1/admin/users/{user_id}"
+    url = f"{SUPABASE_URL}/auth/v1/admin/users/{user_id}"
     r = requests.delete(url, headers=HEADERS)
     return r.json()
 
