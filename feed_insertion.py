@@ -468,7 +468,7 @@ import requests
 
 # Load from secrets
 SUPABASE_URL = st.secrets["supabase"]["url"]
-SERVICE_ROLE_KEY = st.secrets["supabase"]["key"]  # Must be service role key!
+SERVICE_ROLE_KEY = st.secrets["supabase"]["service_role_key"]  # Must be service role key!
 supabase = create_client(SUPABASE_URL, SERVICE_ROLE_KEY)
 
 HEADERS = {
