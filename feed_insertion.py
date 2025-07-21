@@ -464,11 +464,46 @@ import streamlit as st
 from supabase import create_client
 from datetime import datetime
 import uuid
+import requests
 
 # Load from secrets
-url = st.secrets["supabase"]["url"]
-key = st.secrets["supabase"]["key"]
-supabase = create_client(url, key)
+SUPABASE_URL = st.secrets["supabase"]["url"]
+SERVICE_ROLE_KEY = st.secrets["supabase"]["key"]  # Must be service role key!
+supabase = create_client(SUPABASE_URL, SERVICE_ROLE_KEY)
+
+HEADERS = {
+    "apikey": SERVICE_ROLE_KEY,
+    "Authorization": f"Bearer {SERVICE_ROLE_KEY}",
+    "Content-Type": "application/json",
+}
+
+# --- Admin API helper functions ---
+def create_user(email, password):
+    url = f"https://{SUPABASE_URL}/auth/v1/admin/users"
+    payload = {
+        "email": email,
+        "password": password,
+        "email_confirm": True
+    }
+    r = requests.post(url, json=payload, headers=HEADERS)
+    return r.json()
+
+def update_user(user_id, email=None, password=None):
+    url = f"https://{SUPABASE_URL}/auth/v1/admin/users/{user_id}"
+    payload = {}
+    if email:
+        payload["email"] = email
+    if password:
+        payload["password"] = password
+    r = requests.put(url, json=payload, headers=HEADERS)
+    return r.json()
+
+def delete_user(user_id):
+    url = f"https://{SUPABASE_URL}/auth/v1/admin/users/{user_id}"
+    r = requests.delete(url, headers=HEADERS)
+    return r.json()
+
+# ----------- Streamlit UI -----------
 
 st.title("📚 Admin Panel - Content Manager")
 
@@ -489,7 +524,6 @@ with tabs[0]:
     if st.button("Submit"):
         if img_file:
             try:
-                # Generate unique filename
                 unique_filename = f"{uuid.uuid4()}_{img_file.name}"
                 file_bytes = img_file.read()
                 supabase.storage.from_("feed-img").upload(unique_filename, file_bytes)
@@ -630,26 +664,20 @@ with tabs[4]:
                 st.error("Email and password are required!")
             else:
                 try:
-                    # Create user in auth
-                    res = supabase.auth.admin.create_user({
-                        "email": new_email,
-                        "password": new_password,
-                        "email_confirm": True
-                    })
-                    if res.get("error"):
-                        st.error(f"Failed to create user: {res['error']['message']}")
-                    else:
-                        user = res.get("data")
-                        # Insert profile info in authenticated_users table
+                    res = create_user(new_email, new_password)
+                    if res.get("id"):
+                        user_id = res["id"]
                         insert_res = supabase.table("authenticated_users").insert({
-                            "id": user["id"],
+                            "id": user_id,
                             "email": new_email,
                             "full_name": new_full_name
                         }).execute()
                         if insert_res.error:
                             st.warning(f"User created but failed to add profile: {insert_res.error.message}")
                         else:
-                            st.success(f"User created with ID: {user['id']}")
+                            st.success(f"User created with ID: {user_id}")
+                    else:
+                        st.error(f"Failed to create user: {res}")
                 except Exception as e:
                     st.error(f"Exception: {e}")
 
@@ -664,7 +692,7 @@ with tabs[4]:
                 for p in profiles:
                     st.markdown(f"**ID:** {p['id']}")
                     st.markdown(f"**Email:** {p['email']}")
-                    st.markdown(f"**Full Name:** {p.get('full_name','')}")
+                    st.markdown(f"**Full Name:** {p.get('full_name', '')}")
                     st.markdown("---")
             else:
                 st.info("No users found.")
@@ -695,22 +723,16 @@ with tabs[4]:
                             "email": updated_email,
                             "full_name": updated_full_name
                         }
-                        # Update auth user email/password
                         try:
-                            # Update email and password via Admin API
-                            update_auth_resp = supabase.auth.admin.update_user_by_id(user_obj["id"], {
-                                "email": updated_email,
-                                **({"password": updated_password} if updated_password else {})
-                            })
-                            if update_auth_resp.get("error"):
-                                st.error(f"Failed to update auth user: {update_auth_resp['error']['message']}")
-                            else:
-                                # Update authenticated_users table
+                            update_auth_resp = update_user(user_obj["id"], email=updated_email, password=updated_password if updated_password else None)
+                            if update_auth_resp.get("id"):
                                 update_profile_res = supabase.table("authenticated_users").update(update_data).eq("id", user_obj["id"]).execute()
                                 if update_profile_res.error:
                                     st.warning(f"User auth updated but profile update failed: {update_profile_res.error.message}")
                                 else:
                                     st.success("User updated successfully!")
+                            else:
+                                st.error(f"Failed to update auth user: {update_auth_resp}")
                         except Exception as e:
                             st.error(f"Exception during update: {e}")
             else:
@@ -733,17 +755,15 @@ with tabs[4]:
 
                 if st.button("Delete User"):
                     try:
-                        # Delete from auth.users
-                        del_auth_resp = supabase.auth.admin.delete_user(user_obj["id"])
-                        if del_auth_resp.get("error"):
-                            st.error(f"Failed to delete auth user: {del_auth_resp['error']['message']}")
-                        else:
-                            # Delete from authenticated_users table
+                        del_auth_resp = delete_user(user_obj["id"])
+                        if del_auth_resp == {}:  # delete returns empty dict on success
                             del_profile_resp = supabase.table("authenticated_users").delete().eq("id", user_obj["id"]).execute()
                             if del_profile_resp.error:
                                 st.warning(f"Auth user deleted but profile delete failed: {del_profile_resp.error.message}")
                             else:
                                 st.success("User deleted successfully!")
+                        else:
+                            st.error(f"Failed to delete auth user: {del_auth_resp}")
                     except Exception as e:
                         st.error(f"Exception during deletion: {e}")
             else:
