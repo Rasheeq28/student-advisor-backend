@@ -37,14 +37,137 @@
 
 
 # crud
+# import streamlit as st
+# from supabase import create_client
+# import datetime
+#
+# # Supabase client
+# url = st.secrets["supabase"]["url"]
+# key = st.secrets["supabase"]["key"]
+# supabase = create_client(url, key)
+#
+# # Streamlit layout
+# st.set_page_config(page_title="Feed Admin Panel", layout="wide")
+# st.title("📦 Feed Admin Panel")
+#
+# # Tabs for CRUD
+# tab1, tab2, tab3, tab4 = st.tabs(["➕ Create", "📄 Read", "✏️ Update", "❌ Delete"])
+#
+# # CREATE TAB
+# with tab1:
+#     st.subheader("Add New Feed Entry")
+#
+#     producer_name = st.text_input("Producer Name")
+#     img_link = st.text_input("Image Link")
+#     title = st.text_input("Title")
+#     description = st.text_area("Description")
+#     content_type = st.selectbox("Content Type", ["Article", "Course", "CA", "BIzcomp"], key="create_content_type")
+#     tags = st.text_input("Tags (comma separated)")
+#     date_tag = st.date_input("Date Tag")
+#
+#     if st.button("Create Entry"):
+#         data = {
+#             "producer_name": producer_name,
+#             "img_link": img_link,
+#             "title": title,
+#             "Description": description,
+#             "content_type": content_type,
+#             "tags": tags,
+#             "date_tag": date_tag.isoformat(),
+#         }
+#         try:
+#             supabase.table("Feed").insert(data).execute()
+#             st.success("✅ Successfully added!")
+#         except Exception as e:
+#             st.error(f"❌ Error: {e}")
+#
+# # READ TAB
+# with tab2:
+#     st.subheader("All Feed Entries")
+#     try:
+#         res = supabase.table("Feed").select("*").order("created_at", desc=True).execute()
+#         rows = res.data
+#         if rows:
+#             st.dataframe(rows, use_container_width=True)
+#         else:
+#             st.info("No entries found.")
+#     except Exception as e:
+#         st.error(f"❌ Error: {e}")
+#
+# # UPDATE TAB
+# with tab3:
+#     st.subheader("Update an Entry")
+#
+#     try:
+#         entries = supabase.table("Feed").select("id, title").execute().data
+#         entry_dict = {f"{e['title']} ({e['id']})": e["id"] for e in entries}
+#
+#         selected = st.selectbox("Select entry to update", list(entry_dict.keys()), key="update_selectbox")
+#         if selected:
+#             entry_id = entry_dict[selected]
+#             full_entry = supabase.table("Feed").select("*").eq("id", entry_id).single().execute().data
+#
+#             # Editable fields
+#             new_producer_name = st.text_input("Producer Name", full_entry["producer_name"], key="update_producer_name")
+#             new_img_link = st.text_input("Image Link", full_entry["img_link"], key="update_img_link")
+#             new_title = st.text_input("Title", full_entry["title"], key="update_title")
+#             new_description = st.text_area("Description", full_entry.get("Description", ""), key="update_description")
+#             new_content_type = st.selectbox(
+#                 "Content Type",
+#                 ["Article", "Course", "CA", "BIzcomp"],
+#                 index=["Article", "Course", "CA", "BIzcomp"].index(full_entry["content_type"]),
+#                 key="update_content_type"
+#             )
+#             new_tags = st.text_input("Tags", full_entry["tags"], key="update_tags")
+#             new_date_tag = st.date_input("Date Tag", datetime.date.fromisoformat(full_entry["date_tag"]), key="update_date")
+#
+#             if st.button("Update Entry", key="update_button"):
+#                 update_data = {
+#                     "producer_name": new_producer_name,
+#                     "img_link": new_img_link,
+#                     "title": new_title,
+#                     "Description": new_description,
+#                     "content_type": new_content_type,
+#                     "tags": new_tags,
+#                     "date_tag": new_date_tag.isoformat()
+#                 }
+#
+#                 supabase.table("Feed").update(update_data).eq("id", entry_id).execute()
+#                 st.success("✅ Entry updated!")
+#
+#     except Exception as e:
+#         st.error(f"❌ Error: {e}")
+#
+# # DELETE TAB
+# with tab4:
+#     st.subheader("Delete an Entry")
+#     try:
+#         entries = supabase.table("Feed").select("id, title").execute().data
+#         entry_dict = {f"{e['title']} ({e['id']})": e["id"] for e in entries}
+#
+#         selected = st.selectbox("Select entry to delete", list(entry_dict.keys()), key="delete_selectbox")
+#         if selected:
+#             entry_id = entry_dict[selected]
+#             if st.button("Delete Entry", key="delete_button"):
+#                 supabase.table("Feed").delete().eq("id", entry_id).execute()
+#                 st.success("✅ Entry deleted.")
+#     except Exception as e:
+#         st.error(f"❌ Error: {e}")
+
+
+# img upload
 import streamlit as st
 from supabase import create_client
 import datetime
+import uuid
 
 # Supabase client
 url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase = create_client(url, key)
+
+# Constants
+BUCKET = "feed-img"
 
 # Streamlit layout
 st.set_page_config(page_title="Feed Admin Panel", layout="wide")
@@ -53,12 +176,20 @@ st.title("📦 Feed Admin Panel")
 # Tabs for CRUD
 tab1, tab2, tab3, tab4 = st.tabs(["➕ Create", "📄 Read", "✏️ Update", "❌ Delete"])
 
+# Function to upload image and return public URL
+def upload_image_to_supabase(file):
+    ext = file.name.split(".")[-1]
+    file_id = f"{uuid.uuid4()}.{ext}"
+    supabase.storage.from_(BUCKET).upload(file_id, file, {"content-type": file.type})
+    public_url = f"{url}/storage/v1/object/public/{BUCKET}/{file_id}"
+    return public_url
+
 # CREATE TAB
 with tab1:
     st.subheader("Add New Feed Entry")
 
     producer_name = st.text_input("Producer Name")
-    img_link = st.text_input("Image Link")
+    image_file = st.file_uploader("Upload Image", type=["jpg", "jpeg", "png"])
     title = st.text_input("Title")
     description = st.text_area("Description")
     content_type = st.selectbox("Content Type", ["Article", "Course", "CA", "BIzcomp"], key="create_content_type")
@@ -66,20 +197,24 @@ with tab1:
     date_tag = st.date_input("Date Tag")
 
     if st.button("Create Entry"):
-        data = {
-            "producer_name": producer_name,
-            "img_link": img_link,
-            "title": title,
-            "Description": description,
-            "content_type": content_type,
-            "tags": tags,
-            "date_tag": date_tag.isoformat(),
-        }
-        try:
-            supabase.table("Feed").insert(data).execute()
-            st.success("✅ Successfully added!")
-        except Exception as e:
-            st.error(f"❌ Error: {e}")
+        if image_file is None:
+            st.warning("⚠️ Please upload an image file.")
+        else:
+            try:
+                img_link = upload_image_to_supabase(image_file)
+                data = {
+                    "producer_name": producer_name,
+                    "img_link": img_link,
+                    "title": title,
+                    "Description": description,
+                    "content_type": content_type,
+                    "tags": tags,
+                    "date_tag": date_tag.isoformat(),
+                }
+                supabase.table("Feed").insert(data).execute()
+                st.success("✅ Successfully added!")
+            except Exception as e:
+                st.error(f"❌ Error uploading: {e}")
 
 # READ TAB
 with tab2:
@@ -109,7 +244,6 @@ with tab3:
 
             # Editable fields
             new_producer_name = st.text_input("Producer Name", full_entry["producer_name"], key="update_producer_name")
-            new_img_link = st.text_input("Image Link", full_entry["img_link"], key="update_img_link")
             new_title = st.text_input("Title", full_entry["title"], key="update_title")
             new_description = st.text_area("Description", full_entry.get("Description", ""), key="update_description")
             new_content_type = st.selectbox(
@@ -121,10 +255,16 @@ with tab3:
             new_tags = st.text_input("Tags", full_entry["tags"], key="update_tags")
             new_date_tag = st.date_input("Date Tag", datetime.date.fromisoformat(full_entry["date_tag"]), key="update_date")
 
+            image_file_update = st.file_uploader("Replace Image (optional)", type=["jpg", "jpeg", "png"], key="update_image")
+
             if st.button("Update Entry", key="update_button"):
+                img_link = full_entry["img_link"]
+                if image_file_update:
+                    img_link = upload_image_to_supabase(image_file_update)
+
                 update_data = {
                     "producer_name": new_producer_name,
-                    "img_link": new_img_link,
+                    "img_link": img_link,
                     "title": new_title,
                     "Description": new_description,
                     "content_type": new_content_type,
