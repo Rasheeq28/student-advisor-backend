@@ -23,7 +23,7 @@ if st.button("Submit"):
         "producer_name": producer_name,
         "img_link": img_link,
         "title": title,
-        "description": description,
+        "Description": description,
         "content_type": content_type,
         "tags": tags,
         "date_tag": str(date_tag),
