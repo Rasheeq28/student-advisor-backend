@@ -158,152 +158,148 @@
 # img upload
 import streamlit as st
 from supabase import create_client
-import datetime
-import os
+from datetime import datetime
+import uuid
 
-# Load Supabase credentials
+# Load from secrets
 url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase = create_client(url, key)
 
-st.set_page_config(page_title="Admin Panel - Feed CRUD", layout="wide")
+st.title("📚 Admin Panel - Content Manager")
 
-st.title("📡 Admin Panel - Feed CRUD")
+tabs = st.tabs(["➕ Create", "📖 Read", "📝 Update", "❌ Delete"])
 
-tab1, tab2, tab3, tab4 = st.tabs(["➕ Add", "📄 Read", "✏️ Update", "❌ Delete"])
+# ---------- CREATE ----------
+with tabs[0]:
+    st.header("Add New Content")
 
-# Helper: Upload image to Supabase Storage
-def upload_image(file):
-    try:
-        path = f"feed/{file.name}"
-        supabase.storage.from_("feed-img").upload(path, file)
-        url = supabase.storage.from_("feed-img").get_public_url(path)
-        return url
-    except Exception as e:
-        st.error(f"❌ Upload failed: {e}")
-        return None
+    producer_name = st.text_input("Producer Name")
+    title = st.text_input("Title")
+    description = st.text_area("Description")
+    content_type = st.selectbox("Content Type", ["Article", "Course", "CA", "Bizcomp"], key="create_content_type")
+    tags = st.text_input("Tags (comma separated)")
+    date_tag = st.date_input("Date Tag")
+    img_file = st.file_uploader("Upload Image", type=["png", "jpg", "jpeg"])
 
-# ➕ Add
-with tab1:
-    st.subheader("Add New Feed Entry")
-    with st.form("add_form"):
-        producer_name = st.text_input("Producer Name")
-        image_file = st.file_uploader("Upload Image", type=["png", "jpg", "jpeg"])
-        title = st.text_input("Title")
-        description = st.text_area("Description")
-        content_type = st.selectbox("Content Type", ["Article", "Course", "CA", "BIzcomp"], key="add_content_type")
-        tags = st.text_input("Tags (comma separated)")
-        date_tag = st.date_input("Date Tag", datetime.date.today())
-        submitted = st.form_submit_button("Submit")
-
-        if submitted:
-            if image_file:
-                img_link = upload_image(image_file)
-                if not img_link:
-                    st.stop()
-            else:
-                st.error("Please upload an image.")
-                st.stop()
-
-            data = {
-                "producer_name": producer_name,
-                "img_link": img_link,
-                "title": title,
-                "Description": description,
-                "content_type": content_type,
-                "tags": tags,
-                "date_tag": str(date_tag),
-            }
-
+    if st.button("Submit"):
+        if img_file:
             try:
-                supabase.table("Feed").insert(data).execute()
-                st.success("✅ Successfully added to Supabase!")
+                # Generate unique filename
+                unique_filename = f"{uuid.uuid4()}_{img_file.name}"
+                file_bytes = img_file.read()
+
+                supabase.storage.from_("feed-img").upload(unique_filename, file_bytes)
+                public_url = supabase.storage.from_("feed-img").get_public_url(unique_filename)
             except Exception as e:
-                st.error(f"❌ Error uploading: {e}")
+                st.error(f"❌ Upload failed: {e}")
+                st.stop()
+        else:
+            public_url = ""
 
-# 📄 Read
-with tab2:
-    st.subheader("All Feed Entries")
-    search_term = st.text_input("🔍 Search by Title", key="read_search")
+        data = {
+            "producer_name": producer_name,
+            "title": title,
+            "Description": description,
+            "content_type": content_type,
+            "tags": tags,
+            "date_tag": str(date_tag),
+            "img_link": public_url,
+        }
+
+        try:
+            supabase.table("Feed").insert(data).execute()
+            st.success("✅ Content added successfully!")
+        except Exception as e:
+            st.error(f"❌ Error: {e}")
+
+# ---------- READ ----------
+with tabs[1]:
+    st.header("View All Content")
+    search_term = st.text_input("🔍 Search by title or producer name", key="read_search")
+
     try:
-        res = supabase.table("Feed").select("*").execute()
-        entries = res.data
+        response = supabase.table("Feed").select("*").execute()
+        records = response.data
+
         if search_term:
-            entries = [e for e in entries if search_term.lower() in e["title"].lower()]
-        for entry in entries:
-            st.write(entry)
+            records = [r for r in records if search_term.lower() in r["title"].lower() or search_term.lower() in r["producer_name"].lower()]
+
+        if records:
+            for record in records:
+                st.subheader(record["title"])
+                st.markdown(f"**Producer:** {record['producer_name']}")
+                st.markdown(f"**Type:** {record['content_type']}")
+                st.markdown(f"**Tags:** {record['tags']}")
+                st.markdown(f"**Date:** {record['date_tag']}")
+                st.markdown(f"**Description:** {record['Description']}")
+                if record["img_link"]:
+                    st.image(record["img_link"], width=300)
+                st.markdown("---")
+        else:
+            st.info("No records found.")
     except Exception as e:
-        st.error(f"❌ Error fetching data: {e}")
+        st.error(f"❌ Error: {e}")
 
-# ✏️ Update
-with tab3:
-    st.subheader("Update Feed Entry")
-    search_update = st.text_input("🔍 Search by Title", key="update_search")
+# ---------- UPDATE ----------
+with tabs[2]:
+    st.header("Update Existing Content")
     try:
-        res = supabase.table("Feed").select("*").execute()
-        entries = res.data
-        if search_update:
-            entries = [e for e in entries if search_update.lower() in e["title"].lower()]
-        titles = [e["title"] for e in entries]
+        response = supabase.table("Feed").select("*").execute()
+        records = response.data
+        search_term = st.text_input("🔍 Search by title", key="update_search")
+
+        if search_term:
+            records = [r for r in records if search_term.lower() in r["title"].lower()]
+
+        titles = [r["title"] for r in records]
         if titles:
-            selected_title = st.selectbox("Select Entry", titles, key="update_title_select")
-            selected_entry = next(e for e in entries if e["title"] == selected_title)
+            selected_title = st.selectbox("Select a title to update", titles, key="update_title")
+            selected_record = next((r for r in records if r["title"] == selected_title), None)
 
-            with st.form("update_form"):
-                new_title = st.text_input("Title", value=selected_entry["title"])
-                new_description = st.text_area("Description", value=selected_entry.get("Description", ""))
-                new_content_type = st.selectbox("Content Type", ["Article", "Course", "CA", "BIzcomp"], index=["Article", "Course", "CA", "BIzcomp"].index(selected_entry["content_type"]), key="update_content_type")
-                new_tags = st.text_input("Tags", value=selected_entry["tags"])
-                new_date_tag = st.date_input("Date", value=datetime.date.fromisoformat(selected_entry["date_tag"]))
-                new_image_file = st.file_uploader("Upload New Image (optional)", type=["png", "jpg", "jpeg"])
+            if selected_record:
+                new_title = st.text_input("Title", selected_record["title"])
+                new_description = st.text_area("Description", selected_record["Description"])
+                new_tags = st.text_input("Tags", selected_record["tags"])
+                new_date_tag = st.date_input("Date Tag", datetime.strptime(selected_record["date_tag"], "%Y-%m-%d"))
+                new_type = st.selectbox("Content Type", ["Article", "Course", "CA", "Bizcomp"], index=["Article", "Course", "CA", "Bizcomp"].index(selected_record["content_type"]), key="update_type")
+                new_img = st.file_uploader("New Image (optional)", key="update_img")
 
-                update_submit = st.form_submit_button("Update")
-
-                if update_submit:
+                if st.button("Update"):
                     update_data = {
                         "title": new_title,
                         "Description": new_description,
-                        "content_type": new_content_type,
                         "tags": new_tags,
                         "date_tag": str(new_date_tag),
+                        "content_type": new_type,
                     }
 
-                    if new_image_file:
-                        new_img_link = upload_image(new_image_file)
-                        if new_img_link:
-                            update_data["img_link"] = new_img_link
+                    if new_img:
+                        unique_filename = f"{uuid.uuid4()}_{new_img.name}"
+                        file_bytes = new_img.read()
+                        supabase.storage.from_("feed-img").upload(unique_filename, file_bytes)
+                        public_url = supabase.storage.from_("feed-img").get_public_url(unique_filename)
+                        update_data["img_link"] = public_url
 
-                    try:
-                        supabase.table("Feed").update(update_data).eq("id", selected_entry["id"]).execute()
-                        st.success("✅ Updated successfully!")
-                    except Exception as e:
-                        st.error(f"❌ Error updating: {e}")
+                    supabase.table("Feed").update(update_data).eq("id", selected_record["id"]).execute()
+                    st.success("✅ Content updated successfully!")
         else:
-            st.info("No matching entries found.")
+            st.info("No records found.")
     except Exception as e:
-        st.error(f"❌ Error loading entries: {e}")
+        st.error(f"❌ Error: {e}")
 
-# ❌ Delete
-with tab4:
-    st.subheader("Delete Feed Entry")
-    search_delete = st.text_input("🔍 Search by Title", key="delete_search")
+# ---------- DELETE ----------
+with tabs[3]:
+    st.header("Delete Content")
     try:
-        res = supabase.table("Feed").select("*").execute()
-        entries = res.data
-        if search_delete:
-            entries = [e for e in entries if search_delete.lower() in e["title"].lower()]
-        titles = [e["title"] for e in entries]
-        if titles:
-            selected_title = st.selectbox("Select Entry", titles, key="delete_title_select")
-            selected_entry = next(e for e in entries if e["title"] == selected_title)
-            if st.button("Delete"):
-                try:
-                    supabase.table("Feed").delete().eq("id", selected_entry["id"]).execute()
-                    st.success("✅ Deleted successfully!")
-                except Exception as e:
-                    st.error(f"❌ Error deleting: {e}")
-        else:
-            st.info("No matching entries found.")
-    except Exception as e:
-        st.error(f"❌ Error loading entries: {e}")
+        response = supabase.table("Feed").select("*").execute()
+        records = response.data
+        titles = [r["title"] for r in records]
+        selected_title = st.selectbox("Select a title to delete", titles, key="delete_title")
+        selected_record = next((r for r in records if r["title"] == selected_title), None)
 
+        if st.button("Delete"):
+            supabase.table("Feed").delete().eq("id", selected_record["id"]).execute()
+            st.success("🗑️ Deleted successfully!")
+    except Exception as e:
+        st.error(f"❌ Error: {e}")
