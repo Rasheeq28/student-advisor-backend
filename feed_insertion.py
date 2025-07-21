@@ -1632,10 +1632,11 @@ with tabs[4]:
     user_tabs = st.tabs(["➕ Add User", "📋 List Users", "📝 Update User", "❌ Delete User"])
 
     def check_response(response):
-        if response.status_code >= 200 and response.status_code < 300:
+        # response is APIResponse object
+        if response.error is None:
             return True, response.data
         else:
-            return False, response.data
+            return False, response.error.message if hasattr(response.error, 'message') else str(response.error)
 
     # 1. Add User
     with user_tabs[0]:
@@ -1745,8 +1746,7 @@ with tabs[4]:
                 if st.button("Delete User"):
                     try:
                         del_auth_resp = delete_user(user_obj["id"])
-                        # delete_user returns {} on success
-                        if del_auth_resp == {}:
+                        if del_auth_resp == {}:  # delete returns empty dict on success
                             del_profile_resp = supabase.table("authenticated_users").delete().eq("id", user_obj["id"]).execute()
                             success, data_or_error = check_response(del_profile_resp)
                             if not success:
