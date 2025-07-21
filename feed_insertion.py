@@ -1631,6 +1631,12 @@ with tabs[4]:
 
     user_tabs = st.tabs(["➕ Add User", "📋 List Users", "📝 Update User", "❌ Delete User"])
 
+    def check_response(response):
+        if response.status_code >= 200 and response.status_code < 300:
+            return True, response.data
+        else:
+            return False, response.data
+
     # 1. Add User
     with user_tabs[0]:
         st.subheader("Add New User")
@@ -1646,14 +1652,14 @@ with tabs[4]:
                     res = create_user(new_email, new_password)
                     if res.get("id"):
                         user_id = res["id"]
-                        # Insert profile WITHOUT password
                         insert_res = supabase.table("authenticated_users").insert({
                             "id": user_id,
                             "email": new_email,
                             "full_name": new_full_name
                         }).execute()
-                        if insert_res.error:
-                            st.warning(f"User created but failed to add profile: {insert_res.error.message}")
+                        success, data_or_error = check_response(insert_res)
+                        if not success:
+                            st.warning(f"User created but failed to add profile: {data_or_error}")
                         else:
                             st.success(f"User created with ID: {user_id}")
                     else:
@@ -1666,10 +1672,8 @@ with tabs[4]:
         st.subheader("List Users")
         try:
             profiles_res = supabase.table("authenticated_users").select("*").execute()
-            if profiles_res.error:
-                st.error(f"Error fetching users: {profiles_res.error.message}")
-            else:
-                profiles = profiles_res.data
+            success, profiles = check_response(profiles_res)
+            if success:
                 if profiles:
                     for p in profiles:
                         st.markdown(f"**ID:** {p['id']}")
@@ -1678,8 +1682,10 @@ with tabs[4]:
                         st.markdown("---")
                 else:
                     st.info("No users found.")
+            else:
+                st.error(f"Error fetching users: {profiles}")
         except Exception as e:
-            st.error(f"Error fetching users: {e}")
+            st.error(f"Exception fetching users: {e}")
 
     # 3. Update User
     with user_tabs[2]:
@@ -1687,44 +1693,39 @@ with tabs[4]:
 
         try:
             profiles_res = supabase.table("authenticated_users").select("*").execute()
-            if profiles_res.error:
-                st.error(f"Error fetching users: {profiles_res.error.message}")
-            else:
-                profiles = profiles_res.data
-                if profiles:
-                    user_display = [f"{p['email']} - {p.get('full_name', '')}" for p in profiles]
-                    selected_user = st.selectbox("Select user to update", user_display)
+            success, profiles = check_response(profiles_res)
 
-                    user_obj = next((p for p in profiles if f"{p['email']} - {p.get('full_name', '')}" == selected_user), None)
+            if success and profiles:
+                user_display = [f"{p['email']} - {p.get('full_name', '')}" for p in profiles]
+                selected_user = st.selectbox("Select user to update", user_display)
 
-                    if user_obj:
-                        updated_email = st.text_input("Email", value=user_obj["email"], key="update_email")
-                        updated_full_name = st.text_input("Full Name", value=user_obj.get("full_name", ""), key="update_full_name")
-                        updated_password = st.text_input("New Password (leave blank to keep unchanged)", type="password", key="update_password")
+                user_obj = next((p for p in profiles if f"{p['email']} - {p.get('full_name', '')}" == selected_user), None)
 
-                        if st.button("Update User"):
-                            update_data = {
-                                "email": updated_email,
-                                "full_name": updated_full_name
-                            }
-                            try:
-                                update_auth_resp = update_user(
-                                    user_obj["id"],
-                                    email=updated_email,
-                                    password=updated_password if updated_password else None
-                                )
-                                if update_auth_resp.get("id"):
-                                    update_profile_res = supabase.table("authenticated_users").update(update_data).eq("id", user_obj["id"]).execute()
-                                    if update_profile_res.error:
-                                        st.warning(f"User auth updated but profile update failed: {update_profile_res.error.message}")
-                                    else:
-                                        st.success("User updated successfully!")
+                if user_obj:
+                    updated_email = st.text_input("Email", value=user_obj["email"], key="update_email")
+                    updated_full_name = st.text_input("Full Name", value=user_obj.get("full_name", ""), key="update_full_name")
+                    updated_password = st.text_input("New Password (leave blank to keep unchanged)", type="password", key="update_password")
+
+                    if st.button("Update User"):
+                        update_data = {
+                            "email": updated_email,
+                            "full_name": updated_full_name
+                        }
+                        try:
+                            update_auth_resp = update_user(user_obj["id"], email=updated_email, password=updated_password if updated_password else None)
+                            if update_auth_resp.get("id"):
+                                update_profile_res = supabase.table("authenticated_users").update(update_data).eq("id", user_obj["id"]).execute()
+                                success, data_or_error = check_response(update_profile_res)
+                                if not success:
+                                    st.warning(f"User auth updated but profile update failed: {data_or_error}")
                                 else:
-                                    st.error(f"Failed to update auth user: {update_auth_resp}")
-                            except Exception as e:
-                                st.error(f"Exception during update: {e}")
-                else:
-                    st.info("No users found.")
+                                    st.success("User updated successfully!")
+                            else:
+                                st.error(f"Failed to update auth user: {update_auth_resp}")
+                        except Exception as e:
+                            st.error(f"Exception during update: {e}")
+            else:
+                st.info("No users found.")
         except Exception as e:
             st.error(f"Error fetching users: {e}")
 
@@ -1733,31 +1734,30 @@ with tabs[4]:
         st.subheader("Delete User")
         try:
             profiles_res = supabase.table("authenticated_users").select("*").execute()
-            if profiles_res.error:
-                st.error(f"Error fetching users: {profiles_res.error.message}")
-            else:
-                profiles = profiles_res.data
-                if profiles:
-                    user_display = [f"{p['email']} - {p.get('full_name', '')}" for p in profiles]
-                    selected_user = st.selectbox("Select user to delete", user_display)
+            success, profiles = check_response(profiles_res)
 
-                    user_obj = next((p for p in profiles if f"{p['email']} - {p.get('full_name', '')}" == selected_user), None)
+            if success and profiles:
+                user_display = [f"{p['email']} - {p.get('full_name', '')}" for p in profiles]
+                selected_user = st.selectbox("Select user to delete", user_display)
 
-                    if st.button("Delete User"):
-                        try:
-                            del_auth_resp = delete_user(user_obj["id"])
-                            # Supabase Auth returns {} on successful delete
-                            if del_auth_resp == {}:
-                                del_profile_resp = supabase.table("authenticated_users").delete().eq("id", user_obj["id"]).execute()
-                                if del_profile_resp.error:
-                                    st.warning(f"Auth user deleted but profile delete failed: {del_profile_resp.error.message}")
-                                else:
-                                    st.success("User deleted successfully!")
+                user_obj = next((p for p in profiles if f"{p['email']} - {p.get('full_name', '')}" == selected_user), None)
+
+                if st.button("Delete User"):
+                    try:
+                        del_auth_resp = delete_user(user_obj["id"])
+                        # delete_user returns {} on success
+                        if del_auth_resp == {}:
+                            del_profile_resp = supabase.table("authenticated_users").delete().eq("id", user_obj["id"]).execute()
+                            success, data_or_error = check_response(del_profile_resp)
+                            if not success:
+                                st.warning(f"Auth user deleted but profile delete failed: {data_or_error}")
                             else:
-                                st.error(f"Failed to delete auth user: {del_auth_resp}")
-                        except Exception as e:
-                            st.error(f"Exception during deletion: {e}")
-                else:
-                    st.info("No users found.")
+                                st.success("User deleted successfully!")
+                        else:
+                            st.error(f"Failed to delete auth user: {del_auth_resp}")
+                    except Exception as e:
+                        st.error(f"Exception during deletion: {e}")
+            else:
+                st.info("No users found.")
         except Exception as e:
             st.error(f"Error fetching users: {e}")
