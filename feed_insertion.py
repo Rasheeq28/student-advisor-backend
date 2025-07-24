@@ -1314,8 +1314,7 @@ with tabs[4]:
 
     user_tabs = st.tabs(["➕ Add User", "📋 List Users", "📝 Update User", "❌ Delete User"])
 
-    # 1. Add User
-    # 1. Add User
+    # Add User tab
     with user_tabs[0]:
         st.subheader("Add New User")
         new_email = st.text_input("Email", key="new_email")
@@ -1336,10 +1335,10 @@ with tabs[4]:
                             "full_name": new_full_name
                         }).execute()
 
-                        if insert_res.status_code >= 400:
-                            st.warning(f"User created but failed to add profile: {insert_res}")
-                        else:
+                        if insert_res.data:
                             st.success(f"User created with ID: {user_id}")
+                        else:
+                            st.warning(f"User created in auth but failed to add profile: {insert_res}")
                     else:
                         st.error(f"Failed to create user: {res}")
                 except Exception as e:
