@@ -1386,43 +1386,23 @@ with tabs[4]:
         except Exception as e:
             st.error(f"Error fetching users: {e}")
 
-    # 4. Delete User
-    # 4. Delete User
-    with user_tabs[3]:
-        st.subheader("Delete User")
-        try:
-            profiles_res = supabase.table("authenticated_users").select("*").execute()
-            profiles = profiles_res.data
 
-            if profiles:
-                user_display = [f"{p['email']} - {p.get('full_name', '')}" for p in profiles]
-                selected_user = st.selectbox("Select user to delete", user_display)
+    def delete_user(user_id):
+        url = f"{SUPABASE_URL}/auth/v1/admin/users/{user_id}"
 
-                user_obj = next((p for p in profiles if f"{p['email']} - {p.get('full_name', '')}" == selected_user),
-                                None)
+        response = requests.delete(url, headers=HEADERS)
 
-                if st.button("Delete User"):
-                    try:
-                        # Step 1: Delete from authenticated_users table (dependent table)
-                        del_profile_resp = supabase.table("authenticated_users").delete().eq("id",
-                                                                                             user_obj["id"]).execute()
-
-                        if del_profile_resp.error:
-                            st.error(f"❌ Failed to delete user profile: {del_profile_resp.error.message}")
-                        else:
-                            # Step 2: Delete from Supabase Auth (users table)
-                            del_auth_resp = delete_user(user_obj["id"])
-                            if del_auth_resp == {}:  # empty dict = success
-                                st.success("✅ User deleted successfully!")
-                            else:
-                                st.error(f"❌ Failed to delete auth user: {del_auth_resp}")
-                    except Exception as e:
-                        st.error(f"❌ Exception during deletion: {e}")
-            else:
-                st.info("No users found.")
-        except Exception as e:
-            st.error(f"❌ Error fetching users: {e}")
-
-
-
+        if response.status_code == 204:
+            return {}  # ✅ Success: user deleted
+        else:
+            # ❌ Failure: try to extract error details
+            try:
+                return response.json()  # Supabase usually returns JSON errors
+            except Exception:
+                # If not JSON, return raw response info
+                return {
+                    "error": "Failed to parse error response",
+                    "status_code": response.status_code,
+                    "text": response.text
+                }
 
