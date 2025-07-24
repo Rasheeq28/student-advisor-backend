@@ -1474,6 +1474,13 @@ from datetime import datetime
 import uuid
 import requests
 
+# Initialize refresh counter for app "refresh"
+if "refresh_counter" not in st.session_state:
+    st.session_state.refresh_counter = 0
+
+def refresh_app():
+    st.session_state.refresh_counter += 1
+
 # Load from secrets
 SUPABASE_URL = st.secrets["supabase"]["url"]
 SERVICE_ROLE_KEY = st.secrets["supabase"]["service_role_key"]  # Must be service role key!
@@ -1522,7 +1529,6 @@ def delete_user(user_id):
             "text": response.text
         }
 
-
 # ----------- Streamlit UI -----------
 
 st.title("📚 Admin Panel - Content Manager")
@@ -1567,7 +1573,7 @@ with tabs[0]:
         try:
             supabase.table("Feed").insert(data).execute()
             st.success("✅ Content added successfully!")
-            st.experimental_rerun()  # <-- Refresh app after create
+            refresh_app()  # <-- Refresh app after create
         except Exception as e:
             st.error(f"❌ Error: {e}")
 
@@ -1642,7 +1648,7 @@ with tabs[2]:
 
                     supabase.table("Feed").update(update_data).eq("id", selected_record["id"]).execute()
                     st.success("✅ Content updated successfully!")
-                    st.experimental_rerun()  # <-- Refresh app after update
+                    refresh_app()  # <-- Refresh app after update
         else:
             st.info("No records found.")
     except Exception as e:
@@ -1666,7 +1672,7 @@ with tabs[3]:
         if st.button("Delete"):
             supabase.table("Feed").delete().eq("id", selected_record["id"]).execute()
             st.success("🗑️ Deleted successfully!")
-            st.experimental_rerun()  # <-- Refresh app after delete
+            refresh_app()  # <-- Refresh app after delete
     except Exception as e:
         st.error(f"❌ Error: {e}")
 
@@ -1699,7 +1705,7 @@ with tabs[4]:
 
                         if insert_res.data:
                             st.success(f"User created with ID: {user_id}")
-                            st.experimental_rerun()  # <-- Refresh app after user create
+                            refresh_app()  # <-- Refresh app after user create
                         else:
                             st.warning(f"User created in auth but failed to add profile: {insert_res}")
                     else:
@@ -1766,7 +1772,7 @@ with tabs[4]:
                                     st.warning(f"Auth updated but profile update failed: {update_profile_res.error.message}")
                                 else:
                                     st.success("✅ User updated successfully!")
-                                    st.experimental_rerun()  # <-- Refresh app after update user
+                                    refresh_app()  # <-- Refresh app after update user
                             else:
                                 st.error(f"❌ Failed to update auth user: {update_resp}")
 
@@ -1809,7 +1815,7 @@ with tabs[4]:
 
                             if auth_del.get("success") == True or auth_del == {}:
                                 st.success("✅ User deleted from Supabase Auth.")
-                                st.experimental_rerun()  # <-- Refresh app after delete user
+                                refresh_app()  # <-- Refresh app after delete user
                             else:
                                 st.error("❌ Failed to delete user from Supabase Auth.")
                                 st.json(auth_del)
@@ -1820,4 +1826,3 @@ with tabs[4]:
                 st.info("No users found.")
         except Exception as e:
             st.error(f"❌ Error fetching users: {e}")
-
