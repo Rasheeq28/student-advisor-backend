@@ -1406,3 +1406,17 @@ with tabs[4]:
                     "text": response.text
                 }
 
+        # Step 1: Delete from custom table first
+        del_profile_resp = supabase.table("authenticated_users").delete().eq("id", user_obj["id"]).execute()
+
+        if del_profile_resp.error:
+            st.error(f"❌ Failed to delete user profile: {del_profile_resp.error.message}")
+        else:
+            # Step 2: Then delete from Supabase Auth
+            del_auth_resp = delete_user(user_obj["id"])
+
+            if del_auth_resp == {}:
+                st.success("✅ User deleted successfully!")
+            else:
+                st.error("❌ Failed to delete user from Supabase Auth")
+                st.json(del_auth_resp)  # Show the exact error response
