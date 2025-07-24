@@ -1153,16 +1153,17 @@ def delete_user(user_id):
     response = requests.delete(url, headers=HEADERS)
 
     if response.status_code == 204:
-        return {}  # ✅ Success
-    else:
-        try:
-            return response.json()
-        except Exception:
-            return {
-                "error": "Failed to parse response",
-                "status_code": response.status_code,
-                "text": response.text
-            }
+        return {"success": True}  # Success
+    try:
+        return response.json()
+    except Exception:
+        return {
+            "success": False,
+            "error": "Failed to parse response",
+            "status_code": response.status_code,
+            "text": response.text
+        }
+
 
 # ----------- Streamlit UI -----------
 
@@ -1419,31 +1420,32 @@ with tabs[4]:
 
                 if st.button("Delete User"):
                     try:
-                        st.write(f"🧪 Deleting user ID: `{user_obj['id']}`")
+                        user_id = user_obj["id"]
+                        st.write(f"🧪 Deleting user ID: `{user_id}`")
 
                         # Step 1: Delete from authenticated_users table
-                        del_profile_resp = supabase.table("authenticated_users").delete().eq("id",
-                                                                                             user_obj["id"]).execute()
-
-                        if del_profile_resp.error:
-                            st.error(f"❌ Failed to delete user profile: {del_profile_resp.error.message}")
+                        profile_del = supabase.table("authenticated_users").delete().eq("id", user_id).execute()
+                        if getattr(profile_del, "status_code", 200) >= 400:
+                            st.error(f"❌ Failed to delete user profile.")
+                            st.json(profile_del)
                         else:
-                            # Step 2: Delete from Supabase Auth
-                            del_auth_resp = delete_user(user_obj["id"])
+                            st.success("✅ Deleted from profile table.")
 
-                            if del_auth_resp == {}:
-                                st.success("✅ User deleted successfully!")
+                            # Step 2: Delete from Supabase Auth
+                            auth_del = delete_user(user_id)
+
+                            if auth_del.get("success") == True or auth_del == {}:
+                                st.success("✅ User deleted from Supabase Auth.")
                             else:
-                                st.error("❌ Failed to delete auth user")
-                                st.json(del_auth_resp)  # Show error details
+                                st.error("❌ Failed to delete user from Supabase Auth.")
+                                st.json(auth_del)
+
                     except Exception as e:
                         st.error(f"❌ Exception during deletion: {e}")
             else:
                 st.info("No users found.")
         except Exception as e:
             st.error(f"❌ Error fetching users: {e}")
-
-
 
 
 
