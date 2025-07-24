@@ -1374,34 +1374,50 @@ with tabs[4]:
                 user_display = [f"{p['email']} - {p.get('full_name', '')}" for p in profiles]
                 selected_user = st.selectbox("Select user to update", user_display)
 
-                user_obj = next((p for p in profiles if f"{p['email']} - {p.get('full_name', '')}" == selected_user), None)
+                user_obj = next(
+                    (p for p in profiles if f"{p['email']} - {p.get('full_name', '')}" == selected_user), None
+                )
 
                 if user_obj:
                     updated_email = st.text_input("Email", value=user_obj["email"], key="update_email")
-                    updated_full_name = st.text_input("Full Name", value=user_obj.get("full_name", ""), key="update_full_name")
-                    updated_password = st.text_input("New Password (leave blank to keep unchanged)", type="password", key="update_password")
+                    updated_full_name = st.text_input("Full Name", value=user_obj.get("full_name", ""),
+                                                      key="update_full_name")
+                    updated_password = st.text_input("New Password (leave blank to keep unchanged)", type="password",
+                                                     key="update_password")
 
                     if st.button("Update User"):
                         update_data = {
                             "email": updated_email,
                             "full_name": updated_full_name
                         }
+
                         try:
-                            update_auth_resp = update_user(user_obj["id"], email=updated_email, password=updated_password if updated_password else None)
-                            if update_auth_resp.get("id"):
-                                update_profile_res = supabase.table("authenticated_users").update(update_data).eq("id", user_obj["id"]).execute()
-                                if update_profile_res.error:
-                                    st.warning(f"User auth updated but profile update failed: {update_profile_res.error.message}")
+                            # Call your update_user function
+                            update_resp = update_user(
+                                user_id=user_obj["id"],
+                                email=updated_email,
+                                password=updated_password if updated_password else None
+                            )
+
+                            if hasattr(update_resp, "data") and update_resp.data and update_resp.data.get("id"):
+                                # Update the custom profile table
+                                update_profile_res = supabase.table("authenticated_users").update(update_data).eq("id",
+                                                                                                                  user_obj[
+                                                                                                                      "id"]).execute()
+
+                                if hasattr(update_profile_res, "error") and update_profile_res.error:
+                                    st.warning(
+                                        f"Auth updated but profile update failed: {update_profile_res.error.message}")
                                 else:
-                                    st.success("User updated successfully!")
+                                    st.success("✅ User updated successfully!")
                             else:
-                                st.error(f"Failed to update auth user: {update_auth_resp}")
+                                st.error(f"❌ Failed to update auth user: {update_resp}")
                         except Exception as e:
-                            st.error(f"Exception during update: {e}")
+                            st.error(f"❌ Exception during update: {e}")
             else:
                 st.info("No users found.")
         except Exception as e:
-            st.error(f"Error fetching users: {e}")
+            st.error(f"❌ Error fetching users: {e}")
 
     # 4. Delete User
     with user_tabs[3]:
