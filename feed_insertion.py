@@ -1362,7 +1362,6 @@ with tabs[4]:
         except Exception as e:
             st.error(f"Error fetching users: {e}")
 
-    # 3. Update User
     with user_tabs[2]:
         st.subheader("Update User")
 
@@ -1392,15 +1391,15 @@ with tabs[4]:
                         }
 
                         try:
-                            # Call your update_user function
                             update_resp = update_user(
                                 user_id=user_obj["id"],
                                 email=updated_email,
                                 password=updated_password if updated_password else None
                             )
 
-                            if hasattr(update_resp, "data") and update_resp.data and update_resp.data.get("id"):
-                                # Update the custom profile table
+                            # Check if update_resp has "id" key to confirm success
+                            if update_resp and update_resp.get("id"):
+                                # Update profile table in Supabase
                                 update_profile_res = supabase.table("authenticated_users").update(update_data).eq("id",
                                                                                                                   user_obj[
                                                                                                                       "id"]).execute()
@@ -1412,6 +1411,7 @@ with tabs[4]:
                                     st.success("✅ User updated successfully!")
                             else:
                                 st.error(f"❌ Failed to update auth user: {update_resp}")
+
                         except Exception as e:
                             st.error(f"❌ Exception during update: {e}")
             else:
