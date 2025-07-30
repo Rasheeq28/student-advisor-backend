@@ -1542,6 +1542,8 @@ with tabs[0]:
     producer_name = st.text_input("Producer Name")
     title = st.text_input("Title")
     description = st.text_area("Description")
+    url = st.text_input("Optional URL (e.g., https://example.com)")
+
     content_type = st.selectbox("Content Type", ["Article", "Course", "CA", "Bizcomp", "Website", "Project"], key="create_content_type")
 
     tags = st.text_input("Tags (comma separated)")
@@ -1569,6 +1571,7 @@ with tabs[0]:
             "tags": tags,
             "date_tag": str(date_tag),
             "img_link": public_url,
+            "url": url,  # <--- NEW FIELD
         }
 
         try:
@@ -1598,6 +1601,9 @@ with tabs[1]:
                 st.markdown(f"**Tags:** {record['tags']}")
                 st.markdown(f"**Date:** {record['date_tag']}")
                 st.markdown(f"**Description:** {record['Description']}")
+                if record.get("url"):
+                    st.markdown(f"[🔗 Visit Link]({record['url']})", unsafe_allow_html=True)
+
                 if record["img_link"]:
                     st.image(record["img_link"], width=300)
                 st.markdown("---")
@@ -1625,6 +1631,8 @@ with tabs[2]:
             if selected_record:
                 new_title = st.text_input("Title", selected_record["title"])
                 new_description = st.text_area("Description", selected_record["Description"])
+                new_url = st.text_input("Optional URL", value=selected_record.get("url", ""), key="update_url")
+
                 new_tags = st.text_input("Tags", selected_record["tags"])
                 new_date_tag = st.date_input("Date Tag", datetime.strptime(selected_record["date_tag"], "%Y-%m-%d"))
                 content_type_options = ["Article", "Course", "CA", "Bizcomp", "Website", "Project"]
@@ -1641,6 +1649,7 @@ with tabs[2]:
                         "tags": new_tags,
                         "date_tag": str(new_date_tag),
                         "content_type": new_type,
+                        "url": new_url,  # <--- NEW FIELD
                     }
 
                     if new_img:
