@@ -1542,7 +1542,8 @@ with tabs[0]:
     producer_name = st.text_input("Producer Name")
     title = st.text_input("Title")
     description = st.text_area("Description")
-    content_type = st.selectbox("Content Type", ["Article", "Course", "CA", "Bizcomp"], key="create_content_type")
+    content_type = st.selectbox("Content Type", ["Article", "Course", "CA", "Bizcomp", "Website", "Project"], key="create_content_type")
+
     tags = st.text_input("Tags (comma separated)")
     date_tag = st.date_input("Date Tag")
     img_file = st.file_uploader("Upload Image", type=["png", "jpg", "jpeg"])
@@ -1626,8 +1627,11 @@ with tabs[2]:
                 new_description = st.text_area("Description", selected_record["Description"])
                 new_tags = st.text_input("Tags", selected_record["tags"])
                 new_date_tag = st.date_input("Date Tag", datetime.strptime(selected_record["date_tag"], "%Y-%m-%d"))
-                new_type = st.selectbox("Content Type", ["Article", "Course", "CA", "Bizcomp"],
-                                        index=["Article", "Course", "CA", "Bizcomp"].index(selected_record["content_type"]), key="update_type")
+                content_type_options = ["Article", "Course", "CA", "Bizcomp", "Website", "Project"]
+                new_type = st.selectbox("Content Type", content_type_options,
+                                        index=content_type_options.index(selected_record["content_type"]),
+                                        key="update_type")
+
                 new_img = st.file_uploader("New Image (optional)", key="update_img")
 
                 if st.button("Update"):
